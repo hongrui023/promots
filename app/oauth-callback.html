@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>授权结果 · AI Prompt Hub</title>
+  <style>
+    :root { --accent: #4f46e5; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: #f5f6f8; color: #1c1f26; padding: 24px;
+    }
+    .box {
+      background: #fff; border-radius: 16px; padding: 32px 28px; max-width: 520px; width: 100%;
+      box-shadow: 0 18px 48px rgba(16, 24, 40, .12); text-align: center;
+    }
+    .icon { font-size: 44px; margin-bottom: 8px; }
+    h1 { font-size: 19px; margin: 0 0 10px; }
+    p { color: #4b5563; font-size: 14px; line-height: 1.7; margin: 0 0 14px; }
+    .token {
+      word-break: break-all; font-family: Consolas, monospace; font-size: 11.5px;
+      background: #fafbfc; border: 1px solid #e6e8ec; border-radius: 9px;
+      padding: 10px 12px; text-align: left; max-height: 130px; overflow-y: auto; color: #6b7280;
+    }
+    button {
+      margin-top: 14px; width: 100%; padding: 11px; border: 0; border-radius: 10px;
+      background: var(--accent); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+      font-family: inherit;
+    }
+    button:hover { background: #6366f1; }
+    .note { font-size: 12.5px; color: #8a909c; margin-top: 14px; }
+  </style>
+</head>
+
+<body>
+  <div class="box">
+    <div class="icon" id="icon">⏳</div>
+    <h1 id="title">正在读取授权信息…</h1>
+    <p id="desc"></p>
+    <div id="token-box" class="token hidden" style="display:none"></div>
+    <button id="btn" style="display:none"></button>
+    <div class="note" id="note"></div>
+  </div>
+
+  <script>
+    (function () {
+      const $ = (s) => document.querySelector(s);
+      const hash = location.hash.startsWith('#') ? location.hash.slice(1) : location.search.slice(1);
+      const params = new URLSearchParams(hash);
+
+      function fail(msg) {
+        $('#icon').textContent = '⚠️';
+        $('#title').textContent = '授权未完成';
+        $('#desc').textContent = msg;
+      }
+
+      const err = params.get('error');
+      if (err) {
+        fail(params.get('error_description') || err);
+        return;
+      }
+
+      const token = params.get('access_token');
+      if (!token) {
+        fail('回调地址里没有 access_token。请确认你用的是「简化模式（Implicit）」授权链接，并且 redirect_uri 与开放平台里登记的一致。');
+        return;
+      }
+
+      const data = {
+        access_token: token,
+        refresh_token: params.get('refresh_token') || '',
+        expires_in: params.get('expires_in') || '',
+        scope: params.get('scope') || '',
+        at: Date.now(),
+      };
+
+      // 写入 localStorage，主应用读取后会自动回填并清除
+      try {
+        localStorage.setItem('aiph-oauth', JSON.stringify(data));
+      } catch (_) { /* 隐私模式下可能失败 */ }
+
+      $('#icon').textContent = '✅';
+      $('#title').textContent = '授权成功';
+      $('#desc').textContent = 'Token 已写入本地。请回到 AI Prompt Hub 的「设置 → 同步 → 百度网盘」，配置会自动回填。';
+      $('#token-box').style.display = 'block';
+      $('#token-box').textContent = token.slice(0, 80) + (token.length > 80 ? '…' : '');
+
+      const btn = $('#btn');
+      btn.style.display = 'block';
+      btn.textContent = '复制 Token（手动粘贴用）';
+      btn.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(token);
+          btn.textContent = '已复制 ✓';
+        } catch (_) {
+          btn.textContent = '复制失败，请手动选中上方文本';
+        }
+      };
+
+      $('#note').textContent = 'Access Token 有效期 30 天，过期后可在设置页点「刷新 Token」。';
+    })();
+  </script>
+</body>
+
+</html>

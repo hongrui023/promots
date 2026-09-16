@@ -1,0 +1,40 @@
+{
+  "name": "AI Prompt Hub · 指令管理中心",
+  "short_name": "Prompt Hub",
+  "description": "跨平台 AI 指令管理中心：多模式搜索、智能分类、云盘同步，一键复制到 ChatGPT / DeepSeek / 豆包 / WorkBuddy",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5f6f8",
+  "theme_color": "#4f46e5",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "新建指令",
+      "short_name": "新建",
+      "url": "./index.html?action=new"
+    },
+    {
+      "name": "设置与同步",
+      "short_name": "设置",
+      "url": "./index.html?action=settings"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "ai-prompt-hub",
+  "version": "1.0.0",
+  "private": true,
+  "description": "跨平台 AI 指令（Prompt）管理中心 —— Windows 桌面端 + Android 移动端，支持多模式搜索、智能分类与云盘同步",
+  "keywords": [
+    "prompt",
+    "prompt-manager",
+    "chatgpt",
+    "deepseek",
+    "doubao",
+    "pwa",
+    "electron"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "gen:pinyin": "node tools/gen-pinyin.js",
+    "serve": "node tools/serve.js",
+    "desktop:install": "npm --prefix desktop install",
+    "desktop:dev": "npm --prefix desktop run dev",
+    "desktop:build": "npm --prefix desktop run build:win"
+  },
+  "devDependencies": {
+    "pinyin-pro": "^3.26.0"
+  }
+}

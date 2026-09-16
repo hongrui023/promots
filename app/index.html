@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#4f46e5" />
+  <meta name="description" content="跨平台 AI 指令管理中心：多模式搜索、智能分类、云盘同步，一键复制到任意 AI 平台" />
+  <title>AI Prompt Hub · 指令管理中心</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+
+<body>
+  <div class="app" id="app">
+    <!-- 侧边栏 -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-logo">P</div>
+        <div class="brand-text">
+          <strong>Prompt Hub</strong>
+          <span id="brand-sub">指令管理中心</span>
+        </div>
+        <button class="icon-btn only-mobile" id="btn-close-sidebar" title="收起">✕</button>
+      </div>
+
+      <button class="btn btn-primary btn-block" id="btn-new">
+        <span class="plus">＋</span> 新建指令
+        <kbd>Ctrl N</kbd>
+      </button>
+
+      <nav class="nav" id="nav-main"></nav>
+
+      <div class="nav-section">
+        <div class="nav-section-head">
+          <span>分类</span>
+          <button class="mini-btn" id="btn-reclassify" title="重新智能分类所有未锁定条目">智能整理</button>
+        </div>
+        <nav class="nav nav-cats" id="nav-cats"></nav>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-head"><span>标签</span></div>
+        <div class="tagcloud" id="tagcloud"></div>
+      </div>
+
+      <div class="sidebar-foot">
+        <button class="ghost-row" id="btn-settings">
+          <span>⚙</span> 设置与同步
+        </button>
+        <div class="sync-badge" id="sync-badge">
+          <span class="dot"></span><span class="txt">未配置同步</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 主区 -->
+    <main class="main">
+      <header class="topbar">
+        <button class="icon-btn only-mobile" id="btn-open-sidebar" title="菜单">☰</button>
+
+        <div class="searchbox">
+          <span class="search-icon">⌕</span>
+          <input id="search-input" type="search" autocomplete="off" spellcheck="false"
+            placeholder="搜索指令…  支持拼音首字母（如 gwxz）" />
+          <button class="icon-btn clear-btn hidden" id="btn-clear-search" title="清空">✕</button>
+        </div>
+
+        <div class="mode-pills" id="mode-pills"></div>
+
+        <div class="topbar-right">
+          <select id="sort-select" class="select" title="排序">
+            <option value="relevance">按相关度</option>
+            <option value="recent">按修改时间</option>
+            <option value="created">按创建时间</option>
+            <option value="used">按使用次数</option>
+            <option value="title">按标题</option>
+          </select>
+          <button class="icon-btn" id="btn-sync" title="立即同步">⟳</button>
+        </div>
+      </header>
+
+      <div class="resultbar">
+        <div class="result-count" id="result-count">—</div>
+        <div class="result-explain" id="result-explain"></div>
+        <div class="chips" id="active-filters"></div>
+      </div>
+
+      <div class="list-wrap">
+        <div class="list" id="list"></div>
+        <div class="empty hidden" id="empty"></div>
+      </div>
+    </main>
+  </div>
+
+  <div class="backdrop" id="sidebar-backdrop"></div>
+  <input type="file" id="file-import" accept=".json,application/json" class="hidden" />
+
+  <script type="module" src="js/main.js"></script>
+</body>
+
+</html>

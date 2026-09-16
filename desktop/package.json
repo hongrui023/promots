@@ -1,0 +1,59 @@
+{
+  "name": "ai-prompt-hub-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI Prompt Hub 桌面端（Electron 外壳）",
+  "main": "main.js",
+  "author": "hongrui023",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron .",
+    "start": "electron .",
+    "build:win": "electron-builder --win --x64",
+    "build:win:portable": "electron-builder --win portable --x64",
+    "build:dir": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.hongrui023.aiprompthub",
+    "productName": "AI Prompt Hub",
+    "copyright": "Copyright © 2026",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../app",
+        "to": "app"
+      }
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "artifactName": "AI-Prompt-Hub-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AI Prompt Hub",
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "AI-Prompt-Hub-${version}-便携版.${ext}"
+    }
+  }
+}
