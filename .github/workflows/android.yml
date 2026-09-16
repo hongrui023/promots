@@ -26,9 +26,14 @@ on:
       - 'capacitor.config.json'
       - '.github/workflows/android.yml'
       - '.github/keystore/**'
-  # 发布 Release 时也构建一次，并把 APK 直接挂上去。
-  # 注意：tags 不能与 push 平级写在 on: 下面，那样是无效的事件名，
-  # 会让整个 workflow 解析失败（GitHub 会把工作流名显示成文件路径）。
+    # 打 tag 时也构建一次（tags 是 push 的子键，不能与 push 平级写在 on: 下）。
+    #
+    # 这里不能只靠下面那个 release 事件：Release 是由 build.yml 里的
+    # softprops 用 GITHUB_TOKEN 创建的，而 GitHub 规定 GITHUB_TOKEN 触发的操作
+    # 不会再触发新的工作流运行（防递归），所以 release: published 实际收不到。
+    # tag 由人（或本地 PAT）创建，能正常触发，这条路才是可靠的。
+    tags:
+      - 'v*'
   release:
     types: [published]
   workflow_dispatch:

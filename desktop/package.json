@@ -1,6 +1,6 @@
 {
   "name": "ai-prompt-hub-desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "AI Prompt Hub 桌面端（Electron 外壳）",
   "main": "main.js",
@@ -46,7 +46,7 @@
         { "target": "nsis", "arch": ["x64"] },
         { "target": "portable", "arch": ["x64"] }
       ],
-      "artifactName": "AI-Prompt-Hub-${version}-${arch}.${ext}"
+      "artifactName": "AI-Prompt-Hub-${version}-setup.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -58,7 +58,7 @@
       "deleteAppDataOnUninstall": false
     },
     "portable": {
-      "artifactName": "AI-Prompt-Hub-${version}-便携版.${ext}"
+      "artifactName": "AI-Prompt-Hub-${version}-portable.${ext}"
     }
   }
 }
