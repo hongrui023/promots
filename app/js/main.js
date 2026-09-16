@@ -12,6 +12,7 @@ import * as llm from './llm.js';
 import * as syncMgr from './sync/manager.js';
 import { ADAPTERS, ADAPTER_MAP, RECOMMENDED, badgeOf } from './sync/adapters.js';
 import { SEED_PROMPTS } from './seed.js';
+import { openBulkImport } from './bulk-import.js';
 import {
   el, clear, toast, modal, confirmDialog, copyText, fmtTime, fmtFull,
   debounce, highlight, initialLetter, hueOf, escapeHtml,
@@ -1334,6 +1335,7 @@ function wireEvents() {
   });
 
   $('#btn-new').addEventListener('click', () => openEditor(null));
+  $('#btn-bulk-import').addEventListener('click', () => openBulkImport());
   $('#btn-settings').addEventListener('click', () => openSettings('sync'));
   $('#btn-sync').addEventListener('click', async () => {
     if (!syncMgr.getConfig().provider) {
@@ -1413,6 +1415,7 @@ function wireEvents() {
   if (globalThis.__aiph?.onMenu) {
     globalThis.__aiph.onMenu((action) => {
       if (action === 'new') openEditor(null);
+      else if (action === 'bulk') openBulkImport();
       else if (action === 'import') $('#file-import').click();
       else if (action === 'export') {
         downloadJSON(store.snapshot(), `ai-prompt-hub-${new Date().toISOString().slice(0, 10)}.json`);

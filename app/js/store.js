@@ -236,6 +236,39 @@ export class Store {
   }
 
   /**
+   * 批量创建。
+   *
+   * 逐条 create 在导入上百条时会开上百个 IndexedDB 事务，慢且容易在中途失败后留下半截数据。
+   * 这里合并成单个事务：要么全进，要么全不进。
+   * 每条的时间戳依次 +1ms，保证导入顺序与 createdAt 排序一致
+   * （同一毫秒内创建的多条否则排序不稳定）。
+   */
+  async createMany(list) {
+    await this.ready();
+    const arr = Array.isArray(list) ? list.filter(Boolean) : [];
+    if (!arr.length) return { created: [], count: 0 };
+
+    const base = Date.now();
+    const created = arr.map((data, i) => {
+      const t = base + i;
+      return normalize({ ...data, id: uid(), createdAt: t, updatedAt: t, deviceId: this.deviceId });
+    });
+
+    const os = tx(this.db, OS_PROMPTS, 'readwrite');
+    for (const p of created) {
+      this.mem.set(p.id, p);
+      os.put(p);
+    }
+    await new Promise((resolve, reject) => {
+      os.transaction.oncomplete = resolve;
+      os.transaction.onerror = () => reject(os.transaction.error);
+    });
+
+    bus.emit('change', { type: 'bulk-create', count: created.length });
+    return { created, count: created.length };
+  }
+
+  /**
    * 更新。传入 $touch 表示仅刷新时间戳。
    * 修改 category 时若 byUser 为 true，则锁定分类。
    */

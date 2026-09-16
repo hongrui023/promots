@@ -577,3 +577,219 @@ mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 1
   .list { display: block; }
   .card { break-inside: avoid; border-color: #ccc; }
 }
+/* ==========================================================================
+   批量导入（长文本 → 指令） 
+   ========================================================================== */
+
+.btn-bulk { margin-top: 8px; background: var(--panel-2); border-style: dashed; }
+.btn-bulk:hover { border-style: solid; border-color: var(--accent-line); color: var(--accent); background: var(--accent-soft); }
+
+.bi-body { display: flex; flex-direction: column; gap: 12px; }
+.bi-foot { flex: none; padding: 11px 18px; border-top: 1px solid var(--border); background: var(--panel-2); }
+.bi-foot-inner { display: flex; align-items: center; gap: 12px; }
+.bi-foot-hint { flex: 1; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.bi-foot-btns { display: flex; gap: 8px; flex: none; }
+
+/* ---------------------------------------------------------------- 第一步 */
+
+.bi-input-head { display: flex; align-items: center; margin-bottom: 7px; }
+.bi-input-title { flex: 1; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.bi-input-acts { display: flex; gap: 6px; }
+
+.bi-textarea {
+  width: 100%; min-height: 260px; max-height: 42vh;
+  border: 1px solid var(--border-strong); border-radius: 10px;
+  padding: 12px 13px; background: var(--panel-2); outline: none;
+  font-family: var(--mono); font-size: 12.6px; line-height: 1.65;
+  resize: vertical;
+  transition: border-color .15s, box-shadow .15s, background .15s;
+}
+.bi-textarea:focus { border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px rgba(79, 70, 229, .12); }
+
+.bi-counter {
+  margin-top: 6px; font-size: 11.5px; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.bi-clip { margin-top: 8px; }
+.mini-btn-accent {
+  border: 1px solid var(--accent-line); background: var(--accent-soft);
+  color: var(--accent); font-size: 12px; font-weight: 600;
+  padding: 5px 11px; border-radius: 7px;
+}
+.mini-btn-accent:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.bi-opts {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 11px 13px; border: 1px solid var(--border);
+  border-radius: 10px; background: var(--panel-2);
+}
+.bi-opts .check.disabled { opacity: .55; }
+.bi-opts .hint { font-size: 11.5px; color: var(--muted); line-height: 1.6; margin: 0; }
+
+/* ---------------------------------------------------------------- 处理中 */
+
+.bi-working { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 64px 0; }
+.bi-spinner {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 3px solid var(--accent-soft); border-top-color: var(--accent);
+  animation: bi-spin .7s linear infinite;
+}
+@keyframes bi-spin { to { transform: rotate(360deg); } }
+.bi-working-text { font-size: 13px; color: var(--text-2); }
+
+/* ---------------------------------------------------------------- 统计条 */
+
+.bi-stats { display: flex; gap: 10px; flex-wrap: wrap; }
+.bi-stat {
+  flex: 1; min-width: 92px;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 9px 12px; border: 1px solid var(--border);
+  border-radius: 10px; background: var(--panel-2);
+}
+.bi-stat-v { font-size: 19px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.15; }
+.bi-stat-l { font-size: 11.5px; color: var(--muted); }
+.bi-stat.ok { border-color: #bbf7d0; background: #f0fdf4; }
+.bi-stat.ok .bi-stat-v { color: var(--ok); }
+.bi-stat.warn { border-color: #fde68a; background: #fffbeb; }
+.bi-stat.warn .bi-stat-v { color: var(--warn); }
+.bi-stat.dim .bi-stat-v { color: var(--muted); }
+
+/* ---------------------------------------------------------------- 诊断 */
+
+.bi-diag { padding: 10px 13px; border-radius: 10px; font-size: 12.3px; line-height: 1.65; }
+.bi-diag.ok { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+.bi-diag.warn { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+.bi-diag-title { font-weight: 600; margin-bottom: 3px; }
+.bi-diag-list { margin: 0; padding-left: 18px; }
+.bi-diag-list li { margin: 1px 0; }
+
+/* ---------------------------------------------------------------- 工具条 */
+
+.bi-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bi-toolbar-left { display: flex; gap: 4px; flex-wrap: wrap; }
+.bi-toolbar-right { margin-left: auto; font-size: 12.5px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+.bi-toolbar .mini-btn {
+  border: 1px solid var(--border); background: var(--panel);
+  padding: 4px 10px; border-radius: 7px; font-size: 12px; color: var(--text-2);
+}
+.bi-toolbar .mini-btn:hover { border-color: var(--accent-line); color: var(--accent); background: var(--accent-soft); }
+
+.bi-tagbar .input-sm { font-size: 12.5px; padding: 7px 10px; }
+
+/* ---------------------------------------------------------------- 候选列表 */
+
+.bi-list {
+  display: flex; flex-direction: column; gap: 7px;
+  max-height: 46vh; overflow-y: auto;
+  padding-right: 3px; margin-right: -3px;
+}
+
+.bi-row {
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--panel-2); overflow: hidden;
+  transition: border-color .13s, background .13s;
+}
+.bi-row:hover { border-color: var(--border-strong); }
+.bi-row.is-prompt { background: var(--panel); border-color: var(--border-strong); }
+.bi-row.is-prompt .bi-row-title { color: var(--text); font-weight: 600; }
+
+.bi-row-head { display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; }
+.bi-row-check { padding-top: 2px; flex: none; }
+.bi-row-check input { width: 15px; height: 15px; accent-color: var(--accent); }
+.bi-row-check input:disabled { cursor: not-allowed; opacity: .4; }
+
+.bi-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.bi-row-line1 { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.bi-row-title { font-size: 13.4px; color: var(--text-2); word-break: break-word; }
+.bi-row-line2 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); }
+.bi-cat { font-weight: 600; }
+.bi-tags { color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px; }
+.bi-len, .bi-line { font-variant-numeric: tabular-nums; }
+.bi-dup-why { color: var(--warn); }
+
+.bi-expand { flex: none; font-size: 14px; color: var(--muted); line-height: 1; padding: 2px 6px; }
+.bi-expand:hover { color: var(--accent); background: var(--accent-soft); }
+
+.bi-badge {
+  flex: none; font-size: 10.5px; font-weight: 600; line-height: 1.5;
+  padding: 1px 6px; border-radius: 5px;
+  background: var(--panel-2); color: var(--muted); border: 1px solid var(--border);
+}
+.bi-badge.kind-prompt { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); }
+.bi-badge.kind-note { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+.bi-badge.kind-table { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+.bi-badge.kind-fragment { background: #f8fafc; color: #94a3b8; border-color: #e8ecf1; }
+.bi-badge.dup { background: #fffbeb; color: var(--warn); border-color: #fde68a; }
+.bi-badge.var { background: #f0fdfa; color: #0d9488; border-color: #99f6e4; }
+
+.bi-why, .bi-warn {
+  font-size: 11.3px; line-height: 1.6;
+  padding: 0 12px 9px 36px;
+}
+.bi-why { color: var(--muted); }
+.bi-warn { color: var(--warn); }
+
+/* ---------------------------------------------------------------- 展开编辑 */
+
+.bi-detail {
+  border-top: 1px dashed var(--border);
+  padding: 12px 12px 13px 36px;
+  background: var(--panel);
+}
+.bi-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.bi-detail .field { margin-bottom: 10px; }
+.bi-detail .field > label { font-size: 11.5px; }
+.input-sm, .select-sm { font-size: 12.5px; padding: 6px 9px; }
+.bi-ta-sm {
+  width: 100%; min-height: 130px; max-height: 320px;
+  border: 1px solid var(--border-strong); border-radius: 9px;
+  padding: 9px 11px; background: var(--panel-2); outline: none;
+  font-family: var(--mono); font-size: 12.2px; line-height: 1.62;
+  resize: vertical;
+}
+.bi-ta-sm:focus { border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px rgba(79, 70, 229, .12); }
+
+.bi-src { margin-top: 4px; }
+.bi-src summary { font-size: 11.5px; color: var(--accent); cursor: pointer; }
+.bi-src-pre {
+  margin: 7px 0 0; padding: 10px;
+  background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 8px; font-family: var(--mono); font-size: 11.5px;
+  line-height: 1.6; color: var(--text-2);
+  max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+}
+
+/* ---------------------------------------------------------------- 高度分配
+
+   弹窗总高是有限的，预览列表是唯一该「吃掉剩余空间」的部分：
+   统计条、诊断、工具条、标签栏高度固定，列表占满其余并把溢出卷起来。
+   不用固定 max-height——那会在小屏上把列表挤成一条缝。
+   （:has 不支持时退回上面给的 max-height，仍可用，只是不撑满。）            */
+
+.modal-body:has(> .bi-body) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-body:has(> .bi-body) > .bi-body { flex: 1; min-height: 0; }
+.bi-body > .bi-list { flex: 1 1 auto; min-height: 110px; max-height: none; }
+.bi-body > .bi-stats,
+.bi-body > .bi-diag,
+.bi-body > .bi-toolbar,
+.bi-body > .bi-tagbar,
+.bi-body > .bi-step { flex: none; }
+
+/* ---------------------------------------------------------------- 移动端 */
+
+@media (max-width: 720px) {
+  .bi-textarea { min-height: 180px; }
+  .bi-list { max-height: none; }
+  .bi-detail-grid { grid-template-columns: 1fr; }
+  .bi-detail { padding-left: 12px; }
+  .bi-foot-inner { flex-direction: column-reverse; align-items: stretch; gap: 9px; }
+  .bi-foot-btns { justify-content: flex-end; }
+  .bi-stat { min-width: 72px; }
+  .bi-stat-v { font-size: 17px; }
+  .bi-tags { max-width: 130px; }
+}

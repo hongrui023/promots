@@ -13,6 +13,12 @@
  */
 
 const PRESETS = {
+  glm: {
+    label: '智谱 GLM',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    model: 'glm-4-flash',
+    doc: 'https://open.bigmodel.cn/usercenter/apikeys',
+  },
   deepseek: {
     label: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com/v1',

@@ -248,6 +248,7 @@ function buildMenu() {
       label: '文件',
       submenu: [
         { label: '新建指令', accelerator: 'CmdOrCtrl+N', click: () => mainWindow?.webContents.send('aiph:menu', 'new') },
+        { label: '批量导入…', accelerator: 'CmdOrCtrl+Shift+N', click: () => mainWindow?.webContents.send('aiph:menu', 'bulk') },
         { type: 'separator' },
         { label: '导入 JSON…', click: () => mainWindow?.webContents.send('aiph:menu', 'import') },
         { label: '导出 JSON…', click: () => mainWindow?.webContents.send('aiph:menu', 'export') },

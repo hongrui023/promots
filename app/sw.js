@@ -14,7 +14,7 @@
  * 避免缓存住鉴权失败之类的脏响应。
  */
 
-const VERSION = 'v1.1.0';
+const VERSION = 'v1.2.0';
 const SHELL_CACHE = `aiph-shell-${VERSION}`;
 
 const SHELL = [
@@ -35,6 +35,8 @@ const SHELL = [
   './js/pinyin-data.js',
   './js/hash.js',
   './js/llm.js',
+  './js/importer.js',
+  './js/bulk-import.js',
   './js/seed.js',
   './js/sync/http.js',
   './js/sync/weiyun.js',

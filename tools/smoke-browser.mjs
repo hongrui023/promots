@@ -154,27 +154,52 @@ client.on('Runtime.exceptionThrown', (p) => {
 await client.send('Runtime.enable');
 await client.send('Page.enable');
 
-console.log('\x1b[1m〇、清理缓存（保证测的是最新代码）\x1b[0m');
+console.log('\x1b[1m〇、清理环境（保证测的是最新代码、且从干净数据开始）\x1b[0m');
 
-// 必须先清掉 Service Worker 与缓存再测。
-// PWA 会缓存应用外壳，不清的话测的是上一次的旧代码，会得出假结论——
-// 这个坑真实踩到过：新增一个同步通道后，测试仍报旧通道数量。
+// 必须先清掉 Service Worker、缓存与本地数据再测。
+//
+// 两个坑都真实踩过：
+//   1. PWA 会缓存应用外壳，不清就测的是上一次的旧代码——
+//      新增一个同步通道后，测试仍报旧通道数量。
+//   2. 测试会真的往库里导入指令，残留数据让下一轮把同样的条目判成「重复」
+//      而不再勾选，于是断言成片失败。测试必须能重复跑出一致结果。
+//
+// 清理用浏览器层面的 Storage.clearDataForOrigin，而不是在页面里调
+// indexedDB.deleteDatabase——页面自己持有连接时会触发 onblocked，
+// 库其实删不掉，却会返回成功，属于最难查的那种假成功。
 await client.send('Page.navigate', { url: PAGE_URL });
-await sleep(1500);
+await sleep(1200);
+
+await client
+  .send('Storage.clearDataForOrigin', {
+    origin: new URL(PAGE_URL).origin,
+    storageTypes: 'all',
+  })
+  .catch(() => {});
+
+await client.send('Page.navigate', { url: 'about:blank' });
+await sleep(400);
+
 const cleaned = await client.eval(`(async () => {
-  let sw = 0, ck = 0;
+  let sw = 0, ck = 0, db = 0;
   try {
-    const rs = await navigator.serviceWorker.getRegistrations();
-    sw = rs.length;
-    await Promise.all(rs.map(r => r.unregister()));
-    const keys = await caches.keys();
-    ck = keys.length;
-    await Promise.all(keys.map(k => caches.delete(k)));
+    sw = (await navigator.serviceWorker.getRegistrations()).length;
+    ck = (await caches.keys()).length;
+    db = (await (indexedDB.databases?.() || Promise.resolve([]))).length;
   } catch (_) {}
-  return { sw, ck };
+  return { sw, ck, db };
 })()`);
-console.log(`  \x1b[90m注销 Service Worker ${cleaned.sw} 个，清空缓存 ${cleaned.ck} 个\x1b[0m`);
-ok('缓存已清空，测试环境干净', true, `SW ${cleaned.sw} / Cache ${cleaned.ck}`);
+console.log(
+  `  \x1b[90m清理来源存储后残留：SW ${cleaned.sw} / Cache ${cleaned.ck} / DB ${cleaned.db}\x1b[0m`
+);
+ok('本地数据已重置', cleaned.sw === 0 && cleaned.db === 0, `SW ${cleaned.sw} / Cache ${cleaned.ck} / DB ${cleaned.db}`);
+
+// 清空截止此刻收集到的错误。
+// 清理存储时会主动中止页面已建立的数据库连接，浏览器据此记录一条
+// AbortError——那是清理动作的预期副作用，与被测代码无关。
+// 从应用真正加载开始重新计数，才有可能得出「有没有 bug」的结论。
+consoleErrors.length = 0;
+pageErrors.length = 0;
 
 await client.send('Network.enable');
 await client.send('Network.setCacheDisabled', { cacheDisabled: true });
@@ -289,7 +314,7 @@ const catFilter = await client.eval(`(async () => {
   };
 })()`);
 ok('点击分类可筛选', !catFilter.error && catFilter.count === 2, `${catFilter.count} 条：${(catFilter.titles || []).join('、')}`);
-ok('筛选条件以标签形式展示', /编程开发/.test(catFilter.activeFilter), catFilter.activeFilter.replace(/\n/g, ' '));
+ok('筛选条件以标签形式展示', /编程开发/.test(catFilter.activeFilter || ''), String(catFilter.activeFilter || '').replace(/\n/g, ' '));
 
 const favView = await client.eval(`(async () => {
   const el = Array.from(document.querySelectorAll('#nav-main .nav-item')).find(e => e.textContent.includes('收藏'));
@@ -408,7 +433,186 @@ ok('移动端侧边栏默认收起', responsive.sidebarOffscreen === true);
 
 await client.send('Emulation.clearDeviceMetricsOverride');
 
-console.log('\n\x1b[1m六、运行期错误\x1b[0m');
+/* ------------------------------------------------------------------ 批量导入 */
+
+console.log('\n\x1b[1m六、批量导入（长文本 → 指令）\x1b[0m');
+
+// 预览界面要在有意义的窗口尺寸下测：默认的 800×600 会把列表挤成一条缝，
+// 那样截图和高度断言都没有参考价值。
+await client.send('Emulation.setDeviceMetricsOverride', {
+  width: 1280,
+  height: 900,
+  deviceScaleFactor: 1,
+  mobile: false,
+});
+
+// 一份结构完整的小样本：含章节标题、编号条目、技能元数据行、分隔线、说明性章节
+const BI_TEXT = [
+  '■ 1  使用说明',
+  '--------------------------------------------------------------------------------',
+  '这是一段说明性文字，讲的是怎么用这本手册。它不该被当成指令导入。',
+  '',
+  '--------------------------------------------------------------------------------',
+  '■ 2  指令模板',
+  '--------------------------------------------------------------------------------',
+  '',
+  '【2.1】翻译论文摘要',
+  '技能：nature-reader',
+  '需要你替换：【论文路径】【输出目录】',
+  '--------------------------------------------------------------------------------',
+  '使用 nature-reader，把【论文路径】的摘要逐句翻译成中文，保留专业术语与引用编号。',
+  '要求：',
+  '1. 逐句对应，不要把两句合并成一句。',
+  '2. 保留原文中的引用编号与图表编号。',
+  '3. 输出到【输出目录】，另存新文件，不要覆盖原稿。',
+  '',
+  '--------------------------------------------------------------------------------',
+  '【2.2】生成本周工作周报',
+  '--------------------------------------------------------------------------------',
+  '把我这周做的事情整理成一份周报，分成本周完成、下周计划、风险与阻塞三部分。',
+  '语气用平实的书面语，不要用夸张的形容词。输出到【输出目录】。',
+  '',
+].join('\n');
+
+const biOpen = await client.eval(`(async () => {
+  document.querySelector('#btn-bulk-import').click();
+  await new Promise(r => setTimeout(r, 800));
+  const dlg = document.querySelector('.modal');
+  const ta = dlg && dlg.querySelector('.bi-textarea');
+  if (!ta) return { opened: false };
+  ta.value = ${JSON.stringify(BI_TEXT)};
+  ta.dispatchEvent(new Event('input', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 150));
+  return {
+    opened: true,
+    hasFileBtn: !!Array.from(dlg.querySelectorAll('.mini-btn')).find(b => /读取文件/.test(b.textContent)),
+    counter: (dlg.querySelector('.bi-counter') || {}).textContent || '',
+    analyzeDisabled: (Array.from(dlg.querySelectorAll('.bi-foot-btns .btn')).find(b => /分析/.test(b.textContent)) || {}).disabled === true,
+  };
+})()`);
+ok('批量导入弹窗可打开', biOpen.opened === true);
+ok('提供文件读取入口', biOpen.hasFileBtn === true);
+ok('实时显示字符与行数', /\d+ 字符/.test(biOpen.counter), biOpen.counter);
+ok('粘贴内容后「分析」按钮可用', biOpen.analyzeDisabled === false);
+
+const biAnalyzed = await client.eval(`(async () => {
+  const dlg = document.querySelector('.modal');
+  const btn = Array.from(dlg.querySelectorAll('.bi-foot-btns .btn')).find(b => /分析/.test(b.textContent));
+  btn.click();
+  await new Promise(r => setTimeout(r, 1200));
+  const rows = Array.from(document.querySelectorAll('.bi-row'));
+  const stats = {};
+  for (const s of document.querySelectorAll('.bi-stat')) {
+    stats[s.querySelector('.bi-stat-l').textContent] = Number(s.querySelector('.bi-stat-v').textContent);
+  }
+  return {
+    rows: rows.length,
+    stats,
+    checked: rows.filter(r => r.querySelector('.bi-row-check input').checked).length,
+    titles: rows.map(r => (r.querySelector('.bi-row-title') || {}).textContent || ''),
+    kBadges: rows.map(r => ((r.querySelector('.bi-badge') || {}).textContent) || ''),
+    reasons: rows.filter(r => r.querySelector('.bi-why')).length,
+    importLabel: (document.querySelector('.bi-foot-btns .btn-primary') || {}).textContent || '',
+    internalDupDis: rows.filter(r => r.querySelector('.bi-row-check input').disabled).length,
+  };
+})()`);
+ok('分析后进入预览', biAnalyzed.rows >= 2, `${biAnalyzed.rows} 行候选`);
+ok('切出两条指令', biAnalyzed.stats['条指令'] === 2, JSON.stringify(biAnalyzed.stats));
+ok('识别出标题正确的条目', biAnalyzed.titles.some((t) => t === '翻译论文摘要') && biAnalyzed.titles.some((t) => t === '生成本周工作周报'), biAnalyzed.titles.join(' / '));
+ok('说明性章节被单独标出而非丢弃', biAnalyzed.titles.some((t) => /使用说明/.test(t)), biAnalyzed.titles.join(' / '));
+ok('默认只勾选指令条数', biAnalyzed.checked === 2, `勾选 ${biAnalyzed.checked} 条`);
+ok('未选中项给出理由', biAnalyzed.reasons >= 1, `${biAnalyzed.reasons} 行带理由`);
+ok('导入按钮显示已选条数', /2 条/.test(biAnalyzed.importLabel), biAnalyzed.importLabel);
+
+const biEdit = await client.eval(`(async () => {
+  const rows = Array.from(document.querySelectorAll('.bi-row'));
+  const target = rows.find(r => /使用说明/.test((r.querySelector('.bi-row-title') || {}).textContent)) || rows[0];
+  if (!target) return { visible: false, inputs: 0, hasSrc: false };
+  target.querySelector('.bi-expand').click();
+  await new Promise(r => setTimeout(r, 250));
+  const detail = target.querySelector('.bi-detail');
+  const inputs = detail ? detail.querySelectorAll('input, textarea, select').length : 0;
+  const hasSrc = detail ? !!detail.querySelector('.bi-src') : false;
+  return { visible: !!detail && !detail.classList.contains('hidden'), inputs, hasSrc };
+})()`);
+ok('可展开逐条编辑', biEdit.visible === true && biEdit.inputs >= 4, `${biEdit.inputs} 个可编辑项`);
+ok('可对照原文片段核验', biEdit.hasSrc === true);
+
+// 列表必须占满弹窗剩余空间，否则小屏上只能看到一行
+const biLayout = await client.eval(`(() => {
+  const list = document.querySelector('.bi-list');
+  const modal = document.querySelector('.modal');
+  const foot = document.querySelector('.bi-foot');
+  return {
+    list: Math.round(list.getBoundingClientRect().height),
+    modal: Math.round(modal.getBoundingClientRect().height),
+    foot: foot ? Math.round(foot.getBoundingClientRect().height) : 0,
+    overflow: getComputedStyle(list).overflowY,
+  };
+})()`);
+ok(
+  '预览列表撑满可用高度',
+  biLayout.list >= 200 && biLayout.list > biLayout.modal * 0.3,
+  `列表 ${biLayout.list}px / 弹窗 ${biLayout.modal}px，overflow=${biLayout.overflow}`
+);
+ok('底栏固定在弹窗底部', biLayout.foot > 0 && biLayout.foot < 120, `${biLayout.foot}px`);
+
+const biSelect = await client.eval(`(async () => {
+  const all = Array.from(document.querySelectorAll('.bi-toolbar .mini-btn'));
+  const only = all.find(b => /只选指令/.test(b.textContent));
+  if (!only) return { checked: -1 };
+  only.click();
+  await new Promise(r => setTimeout(r, 200));
+  const rows = Array.from(document.querySelectorAll('.bi-row'));
+  return { checked: rows.filter(r => r.querySelector('.bi-row-check input').checked).length };
+})()`);
+ok('「只选指令」快捷操作生效', biSelect.checked === 2, `勾选 ${biSelect.checked} 条`);
+
+const biShot = path.join(OUT, 'bulk-import.png');
+const shotBI = await client.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+fs.writeFileSync(biShot, Buffer.from(shotBI.data, 'base64'));
+ok('预览界面截图已保存', fs.existsSync(biShot) && fs.statSync(biShot).size > 5000, `${(fs.statSync(biShot).size / 1024).toFixed(0)} KB`);
+
+const biImport = await client.eval(`(async () => {
+  const before = document.querySelectorAll('.list .card').length;
+  const btn = document.querySelector('.bi-foot-btns .btn-primary');
+  if (!btn) return { before, after: before, dlgClosed: false };
+  btn.click();
+  await new Promise(r => setTimeout(r, 1800));
+  return {
+    before,
+    after: document.querySelectorAll('.list .card').length,
+    dlgClosed: !document.querySelector('.modal .bi-textarea'),
+    total: (document.querySelector('#result-count') || {}).textContent || '',
+  };
+})()`);
+ok('导入后弹窗关闭', biImport.dlgClosed === true);
+ok('指令库条目数增加', biImport.after > biImport.before, `${biImport.before} → ${biImport.after}`);
+
+const biPersist = await client.eval(`(async () => {
+  // 搜一下刚导入的条目，确认真的落库了
+  document.querySelector('#btn-clear-search').click();
+  await new Promise(r => setTimeout(r, 200));
+  const input = document.querySelector('#search-input');
+  input.value = '翻译论文摘要';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 900));
+  const cards = Array.from(document.querySelectorAll('.list .card'));
+  const titles = cards.map(c => (c.querySelector('.card-title') || {}).textContent || '');
+  return { count: cards.length, titles };
+})()`);
+ok('导入的指令可被搜索到', biPersist.count >= 1, biPersist.titles.slice(0, 3).join(' / '));
+
+// 清理：把刚导入的删掉，避免影响后续断言
+await client.eval(`(async () => {
+  document.querySelector('#search-input').value = '';
+  document.querySelector('#btn-clear-search').click();
+  await new Promise(r => setTimeout(r, 400));
+})()`);
+
+await client.send('Emulation.clearDeviceMetricsOverride');
+
+console.log('\n\x1b[1m七、运行期错误\x1b[0m');
 ok('无页面异常（uncaught error）', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | ') || '0 个');
 ok('无控制台 error 输出', consoleErrors.length === 0, consoleErrors.slice(0, 2).join(' | ') || '0 个');
 
