@@ -1,0 +1,49 @@
+# 把 app/ 目录部署成 GitHub Pages 静态站点
+#
+# 为什么用 Actions 而不是直接设置 Pages 的「分支 + 文件夹」：
+#   GitHub Pages 的分支模式只允许 / 或 /docs 作为根目录，而应用在 /app。
+#   Actions 制品模式（upload-pages-artifact）没有这个限制，可以指定任意目录。
+#
+# 部署后：电脑浏览器直接打开即可用；手机 Chrome 打开后「添加到主屏幕」就是 PWA。
+
+name: Deploy PWA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只跑一个部署，新的推送取消排队中的旧任务
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: 部署到 Pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 部署前先跑一遍核心引擎自检
+        run: node tools/verify.mjs
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
