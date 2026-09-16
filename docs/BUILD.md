@@ -226,7 +226,7 @@ node tools/debug-classify.mjs "小红书种草文案"
 
 ---
 
-## 六、重新生成拼音表（一般不需要）
+## 七、重新生成拼音表（一般不需要）
 
 `app/js/pinyin-data.js` 是**生成产物，已提交进仓库**，正常使用不需要动它。只有你想调整覆盖范围时才需要重新生成：
 
@@ -236,3 +236,43 @@ npm run gen:pinyin
 ```
 
 输出：20992 个汉字的首字母 + 1953 个多音字的全部读法，约 31 KB。
+
+---
+
+## 八、`git push` 走不通时怎么办
+
+有些网络环境会屏蔽 `github.com:443`，表现是：
+
+```
+fatal: unable to access 'https://github.com/xxx/yyy.git/':
+  CONNECT tunnel failed, response 502
+```
+
+或直接连接超时。这种情况下 `git push` 没有任何办法跑通——因为它必须连 `github.com`。
+但 `api.github.com` 通常是可以访问的（`curl https://api.github.com` 能返回 200）。
+
+先确认到底是哪个域名不通：
+
+```bash
+curl -s -o /dev/null -w "github.com      -> %{http_code}\n" --max-time 10 https://github.com
+curl -s -o /dev/null -w "api.github.com  -> %{http_code}\n" --max-time 10 https://api.github.com
+```
+
+如果前者 000/超时、后者 200，就用 API 通道推送：
+
+```bash
+GITHUB_TOKEN=ghp_xxx node tools/push-via-api.mjs --dry-run   # 先空跑看看会做什么
+GITHUB_TOKEN=ghp_xxx node tools/push-via-api.mjs             # 正式推送
+```
+
+它会用 Git Data API 把本地每个提交逐个重放：本地 blob → 远端 blob（base64，二进制安全）
+→ 组装 tree → 创建 commit → 更新分支引用。结果与 `git push` 等价——相同的历史结构、
+相同的提交信息与时间戳、相同的文件字节内容（含 PNG 等二进制文件）。
+
+可用环境变量覆盖默认值：`GH_OWNER` / `GH_REPO` / `GH_BRANCH`。
+
+> Token 只从环境变量读取，脚本不写入任何文件。**用完请立刻到
+> <https://github.com/settings/tokens> 撤销。**
+>
+> 需要 `repo` 权限（classic token）；如果仓库里有 `.github/workflows/` 下的文件，
+> 还需要额外勾上 `workflow` 权限。
