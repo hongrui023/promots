@@ -26,8 +26,11 @@ on:
       - 'capacitor.config.json'
       - '.github/workflows/android.yml'
       - '.github/keystore/**'
-  tags:
-    - 'v*'
+  # 发布 Release 时也构建一次，并把 APK 直接挂上去。
+  # 注意：tags 不能与 push 平级写在 on: 下面，那样是无效的事件名，
+  # 会让整个 workflow 解析失败（GitHub 会把工作流名显示成文件路径）。
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -143,8 +146,8 @@ jobs:
           retention-days: 90
 
       # ---------------------------------------------------------------- 发版
-      - name: 附加到 Release（仅打 tag 时）
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: 附加到 Release（仅由 release 事件触发时）
+        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ env.APK_PATH }}
