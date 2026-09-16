@@ -1,0 +1,12 @@
+{
+  "appId": "com.hongrui023.aiprompthub",
+  "appName": "AI Prompt Hub",
+  "webDir": "app",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#f5f6f8",
+    "allowMixedContent": false
+  }
+}

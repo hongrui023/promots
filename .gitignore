@@ -7,9 +7,17 @@ dist/
 build/
 *.tsbuildinfo
 
+# Android 工程由 CI 用 `npx cap add android` 现场生成，不入库。
+# 一旦入库，CI 里那句 `cap add android` 会因为目录已存在而失败；
+# 而且 Gradle 会产生几百 MB 中间产物。
+android/
+capacitor.config.ts
+
 # 自检临时目录
 tools/.verify/
 tools/.dbg/
+tools/.e2e-tmp/
+tools/.params-tmp/
 
 # 用户数据 / 密钥 —— 千万不要提交
 *.local.json
@@ -39,3 +47,8 @@ pnpm-debug.log*
 *.p12
 *.cer
 *.pfx
+
+# 例外：Android 签名密钥必须入库，否则 CI 签不出可覆盖安装的包。
+# 这是一把**公开的**测试密钥（口令 aiprompthub），只用于个人自用分发，
+# 不要用它上架任何应用商店。详见 .github/workflows/android.yml 顶部说明。
+!.github/keystore/aiprompthub.p12
