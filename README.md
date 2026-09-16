@@ -24,16 +24,20 @@
 打开 <https://hongrui023.github.io/promots/> 即可。数据存在你浏览器的本地存储里，
 不经过任何服务器。手机端「添加到主屏幕」后就是一个能离线用的应用。
 
-**方式二：Android APK**（2.9 MB，推荐）
+**方式二：Android APK**（3.0 MB，推荐）
 
-从 [下载页](https://github.com/hongrui023/promots/releases/latest) 拿 `AI-Prompt-Hub-1.0.0.apk`，
+从 [下载页](https://github.com/hongrui023/promots/releases/latest) 拿 `-1.1.0.apk`，
 传到手机上点开安装。若系统提示「未知来源」，需要在设置里允许一次。
 
 比在线版好在：有自己的图标、独立任务栈，不会被浏览器清缓存误删。
+APK 用固定签名，**以后可以直接覆盖升级，不用先卸载**（卸载会清掉本地数据）。
 
 **方式三：Windows 桌面版**（78 MB，独立窗口，多一项微云同步能力）
 
-从 [下载页](https://github.com/hongrui023/promots/releases/latest) 拿 `-portable.exe`，双击运行，无需安装。
+从 [下载页](https://github.com/hongrui023/promots/releases/latest) 二选一：
+
+- `-portable.exe` —— 双击运行，不用安装
+- `-setup.exe` —— 安装版，带开始菜单与桌面快捷方式
 
 > **为什么桌面版值得装**：微云的接口不返回跨域响应头，浏览器里会被安全策略拦掉。
 > 桌面版由主进程代发请求，不受同源策略约束，所以**只有桌面版能直连微云**。
