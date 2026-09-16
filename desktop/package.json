@@ -6,6 +6,10 @@
   "main": "main.js",
   "author": "hongrui023",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hongrui023/promots.git"
+  },
   "scripts": {
     "dev": "electron .",
     "start": "electron .",
@@ -21,6 +25,7 @@
     "appId": "com.hongrui023.aiprompthub",
     "productName": "AI Prompt Hub",
     "copyright": "Copyright © 2026",
+    "publish": null,
     "directories": {
       "output": "dist",
       "buildResources": "build"
