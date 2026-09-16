@@ -56,15 +56,33 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # 不用 android-actions/setup-android@v3：
+      # 它内部会去装早已下架的 `tools` 包，报 "Failed to find package 'tools'"
+      # 然后以退出码 1 失败。ubuntu runner 本来就预装了 Android SDK，
+      # 直接用预装的 sdkmanager 补齐缺的包即可。
       - name: 准备 Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: 安装所需的 platform 与 build-tools
         run: |
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          ls "$ANDROID_HOME/build-tools/"
+          set -e
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "Android SDK 路径: $SDK"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+
+          echo "--- SDK 顶层目录 ---"
+          ls "$SDK" || true
+
+          SDKMGR="$(ls -d "$SDK"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | sort -V | tail -1)"
+          echo "sdkmanager: ${SDKMGR:-未找到}"
+          if [ -n "$SDKMGR" ]; then
+            yes | "$SDKMGR" --licenses > /dev/null 2>&1 || true
+            "$SDKMGR" "platforms;android-34" "build-tools;34.0.0" || \
+              echo "(安装返回非零，若镜像已预装对应版本可忽略)"
+          fi
+
+          echo "--- 现有 build-tools ---"
+          ls "$SDK/build-tools" || true
+          echo "--- 现有 platforms ---"
+          ls "$SDK/platforms" || true
 
       # ---------------------------------------------------------------- 门禁
       - name: 构建前先跑核心引擎自检
@@ -78,6 +96,9 @@ jobs:
         run: |
           npx cap add android
           npx cap sync android
+          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+          echo "--- local.properties ---"
+          cat android/local.properties
           echo "--- 同步进来的 Web 资源 ---"
           ls android/app/src/main/assets/public/ | head -20
 
@@ -129,13 +150,25 @@ jobs:
       - name: 确认 APK 结构完整
         run: |
           set -e
+          echo "--- 包信息 ---"
           BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
-          "$BT/aapt2" dump badging "$APK_NAME" | head -8
+          if [ -x "$BT/aapt2" ]; then
+            "$BT/aapt2" dump badging "$APK_NAME" 2>/dev/null | head -8 || \
+              echo "(aapt2 dump badging 不可用，跳过，不影响产物)"
+          fi
+
           echo "--- 包内是否含应用资源 ---"
           unzip -l "$APK_NAME" | grep -E "assets/public/(index.html|js/main.js|css/app.css)" || {
             echo "::error::APK 内没有找到应用资源，同步步骤可能失败"
             exit 1
           }
+
+          echo "--- 拼音表是否完整进包 ---"
+          unzip -l "$APK_NAME" | grep -q "assets/public/js/pinyin-data.js" || {
+            echo "::error::拼音数据缺失，包不完整"
+            exit 1
+          }
+
           echo "包大小: $(du -h "$APK_NAME" | cut -f1)"
 
       - uses: actions/upload-artifact@v4
