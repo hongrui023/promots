@@ -184,9 +184,12 @@ jobs:
           retention-days: 90
 
       # ---------------------------------------------------------------- 发版
-      - name: 附加到 Release（仅由 release 事件触发时）
-        if: github.event_name == 'release'
+      - name: 附加到 Release（打 tag 时）
+        # 条件是「这次运行是由 tag 触发的」，不是「由 release 事件触发的」。
+        # 后者收不到：Release 由 build.yml 的 softprops 用 GITHUB_TOKEN 创建，
+        # 而 GITHUB_TOKEN 触发的操作不会再触发新工作流（防递归）。
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ env.APK_PATH }}
-          generate_release_notes: true
+          generate_release_notes: false
