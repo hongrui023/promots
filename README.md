@@ -8,28 +8,41 @@
 
 ### [▶ 点这里直接在浏览器里用](https://hongrui023.github.io/promots/)
 
-手机打开同一个网址 → 菜单 → 「添加到主屏幕」，就是一个能离线的应用，不用装 APK。
+电脑浏览器打开即用。手机打开同一网址 → 菜单 → 「添加到主屏幕」，就是一个能离线的应用。
 
-Windows 想要独立窗口、或用腾讯微云同步：[下载免安装版](https://github.com/hongrui023/promots/releases/latest)（77 MB，双击即用）
+想装成独立应用 → [**下载页**](https://github.com/hongrui023/promots/releases/latest)：
+**Android APK**（2.9 MB）· **Windows 免安装版**（78 MB）
 
 </div>
 
 ---
 
-## 两种用法，先选一个
+## 三种用法，先选一个
 
 **方式一：在线直接用**（零安装，手机电脑都能用）
 
 打开 <https://hongrui023.github.io/promots/> 即可。数据存在你浏览器的本地存储里，
 不经过任何服务器。手机端「添加到主屏幕」后就是一个能离线用的应用。
 
-**方式二：Windows 桌面版**（独立窗口，多一项微云同步能力）
+**方式二：Android APK**（2.9 MB，推荐）
 
-从 [Releases](https://github.com/hongrui023/promots/releases/latest) 下载 `-portable.exe`，双击运行，无需安装。
+从 [下载页](https://github.com/hongrui023/promots/releases/latest) 拿 `AI-Prompt-Hub-1.0.0.apk`，
+传到手机上点开安装。若系统提示「未知来源」，需要在设置里允许一次。
+
+比在线版好在：有自己的图标、独立任务栈，不会被浏览器清缓存误删。
+
+**方式三：Windows 桌面版**（78 MB，独立窗口，多一项微云同步能力）
+
+从 [下载页](https://github.com/hongrui023/promots/releases/latest) 拿 `-portable.exe`，双击运行，无需安装。
 
 > **为什么桌面版值得装**：微云的接口不返回跨域响应头，浏览器里会被安全策略拦掉。
 > 桌面版由主进程代发请求，不受同源策略约束，所以**只有桌面版能直连微云**。
-> 如果你主要用微云，装桌面版；如果主要用手机，用在线版配 GitHub Gist。
+> 如果你主要用微云，装桌面版；如果主要用手机，用 APK 或在线版配 GitHub Gist。
+
+> **安装包没有代码签名**，Windows 首次运行可能提示「未知发布者」，点
+> 「更多信息 → 仍要运行」。Android 首次安装需允许「安装未知来源应用」。
+> 签名证书都要钱，个人项目没买；APK 的签名指纹见
+> [.github/workflows/android.yml](.github/workflows/android.yml)。
 
 ---
 
@@ -142,10 +155,19 @@ npm run desktop:build    # 产出 .exe 安装包 + 便携版
 
 ### Android
 
-两种方式，按你的接受度选：
+**最省事**：从 [下载页](https://github.com/hongrui023/promots/releases/latest) 拿现成的 APK。CI 每次改动都会自动重新构建并上传。
 
-1. **装成 PWA**（零成本，推荐先这样）：Android Chrome 打开部署好的网址 → 菜单 → 「添加到主屏幕」。图标、全屏、离线可用，体验接近原生应用。
-2. **打 APK**：用 Capacitor 包装成真正的 APK，需要装 Android SDK。步骤见 [docs/BUILD.md](docs/BUILD.md#android)。
+**自己构建**：APK 需要 JDK 17 + Android SDK（platform 34 + build-tools），本机装齐要 1～2 GB。推荐直接用 GitHub Actions（runner 自带 Android SDK）：
+
+```
+Actions → Build Android APK → Run workflow
+```
+
+跑完在运行详情页底部下载 `ai-prompt-hub-apk` 制品。推 `v*` 标签或发布 Release 时会自动构建并挂到 Release 上。
+
+**不想装 APK**：也可以用 PWA——Android Chrome 打开部署好的网址 → 菜单 → 「添加到主屏幕」。图标、全屏、离线可用，体验接近原生。
+
+本地从零构建的完整步骤见 [docs/BUILD.md](docs/BUILD.md#四android)。
 
 ---
 
@@ -190,7 +212,14 @@ ai-prompt-hub/
 │           ├── adapters.js   # 通道注册表
 │           ├── weiyun.js     # 微云：MCP 协议 + 两阶段上传
 │           └── manager.js    # 同步编排
-├── desktop/                  # Electron 外壳
+├── desktop/                  # Electron 外壳（Windows 桌面端）
+├── capacitor.config.json     # Android 外壳配置
+├── .github/
+│   ├── workflows/
+│   │   ├── pages.yml         # 把 app/ 发布成在线版
+│   │   ├── android.yml       # 云端构建 APK 并签名
+│   │   └── build.yml         # 打 Windows 安装包
+│   └── keystore/             # APK 固定签名密钥（公开的测试密钥，见 BUILD.md）
 ├── tools/
 │   ├── gen-pinyin.js         # 生成拼音表
 │   ├── serve.js              # 零依赖本地服务器

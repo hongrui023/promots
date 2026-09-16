@@ -105,35 +105,83 @@ npm run desktop:build
 
 ## 四、Android
 
-### 方式 A：PWA（推荐先这样）
+### 方式 A：用 CI 构建（推荐）
+
+APK 需要 JDK 17 + Android SDK（platform 34 + build-tools），本机装齐要 1～2 GB。
+GitHub 的 ubuntu runner **自带 Android SDK**，所以最省事的做法是交给 CI：
+
+```
+仓库 → Actions → Build Android APK → Run workflow
+```
+
+跑完在运行详情页底部下载 `ai-prompt-hub-apk` 制品（约 2.9 MB）。
+推 `v*` 标签或发布 Release 时也会自动构建并直接挂到 Release 上。
+
+工作流：`.github/workflows/android.yml`。它做四件事：
+Capacitor 把 `app/` 同步进 Android 工程 → Gradle `assembleRelease` 出未签名包 →
+`apksigner` 用仓库内固定密钥补签 → 校验包内确实含 Web 资源后才上传。
+
+**签名为什么用仓库里的固定密钥**：debug 签名每次构建可能不同，手机上更新得先卸载，
+而卸载会清掉本地数据（IndexedDB）。固定签名才能覆盖安装升级。
+
+> ⚠️ `.github/keystore/aiprompthub.p12` 是一把**公开的**测试密钥（口令 `aiprompthub`），
+> 只适合个人自用分发。**要上架任何应用商店，必须换一把私密密钥**并通过
+> `secrets` 注入，而不是放仓库里。
+>
+> 当前签名指纹（SHA-256）：
+> `15:D8:59:67:71:1C:53:AF:2F:15:96:BE:9D:F6:1B:1D:F3:B9:EE:A8:FB:28:51:4D:55:F1:78:7C:7A:64:D4:97`
+
+### 方式 B：本地从零构建
+
+需要先装好 **JDK 17**（不是 JRE）与 Android SDK，并设置 `ANDROID_HOME`。
+
+```bash
+# 1) 装 Capacitor
+npm install @capacitor/core @capacitor/cli @capacitor/android --save-dev
+# 仓库里已有 capacitor.config.json，不需要再跑 cap init
+
+# 2) 生成 Android 工程（android/ 目录已被 .gitignore 忽略，是生成物）
+npx cap add android
+echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+
+# 3) 每次改完 app/ 下的代码后同步一次
+npx cap sync android
+
+# 4) 构建
+cd android && ./gradlew assembleRelease      # Windows: gradlew.bat assembleRelease
+```
+
+`assembleRelease` 产出的是**未签名**包，需要自己补签：
+
+```bash
+BT="$ANDROID_HOME/build-tools/34.0.0"
+"$BT/zipalign" -f -p 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+"$BT/apksigner" sign --ks 你的密钥 --out AI-Prompt-Hub.apk aligned.apk
+"$BT/apksigner" verify --print-certs AI-Prompt-Hub.apk
+```
+
+> 不要用脚本去改 `android/app/build.gradle` 注入 `signingConfig`——那种做法在
+> Capacitor 或 AGP 版本变化时很容易断，改用 `apksigner` 补签稳定得多。
+
+### 方式 C：PWA（零安装）
 
 1. 把 `app/` 部署到任意 HTTPS 托管（见上文）；
 2. Android Chrome 打开该网址；
 3. 菜单 →「添加到主屏幕」→ 确认。
 
-得到的图标支持全屏、离线启动，和原生应用的使用感受差别很小。缺点：不能访问文件系统，所以「本地同步文件夹」通道不可用（用 Gist / WebDAV / 百度网盘代替）。
+得到的图标支持全屏、离线启动，和原生应用的使用感受差别很小。
+缺点：不能访问文件系统，所以「本地同步文件夹」通道不可用（用 Gist / WebDAV 代替）。
 
-### 方式 B：Capacitor 打成 APK
+### 关于 `capacitor.config.json`
 
-需要先装好 JDK 17 与 Android SDK，并设置 `ANDROID_HOME` 环境变量。
-
-```bash
-# 1) 在项目根目录初始化 Capacitor
-npm install @capacitor/core @capacitor/cli @capacitor/android --save-dev
-npx cap init "AI Prompt Hub" com.hongrui023.aiprompthub --web-dir=app
-
-# 2) 添加 Android 平台
-npx cap add android
-
-# 3) 每次改完 app/ 下的代码后同步一次
-npx cap sync android
-
-# 4) 打开 Android Studio 构建，或直接用命令行
-cd android
-./gradlew assembleDebug        # Windows: gradlew.bat assembleDebug
+```json
+{ "appId": "com.hongrui023.aiprompthub", "appName": "AI Prompt Hub", "webDir": "app",
+  "server": { "androidScheme": "https" } }
 ```
 
-产物：`android/app/build/outputs/apk/debug/app-debug.apk`，传到手机安装即可（需要在系统里允许「安装未知来源应用」）。
+`androidScheme` 固定为 `https` 是有意的：这样 WebView 的页面来源是 `https://localhost`，
+属于**安全上下文**，`navigator.clipboard` 与 Service Worker 才能正常工作——
+而「一键复制」正是这个应用的核心功能。
 
 打包正式版（需要签名密钥）：
 
