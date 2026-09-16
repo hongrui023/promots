@@ -14,11 +14,27 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
+import { execFileSync } from 'node:child_process';
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const SRC = path.join(ROOT, 'app', 'js');
 const TMP = path.join(ROOT, 'tools', '.verify');
+
+/**
+ * 未处理的 Promise 拒绝必须让整个自检失败，并说明可能的原因。
+ *
+ * 加这个兜底是因为踩过一次：main.js 在导入时就会调用 boot()，
+ * boot 的 catch 处理器又去写 document.body，于是抛出未处理的拒绝。
+ * 本地跑得快、进程先退出了，看不出问题；CI 上稳定以退出码 1 失败。
+ * 静默的竞态是最难查的一类问题，所以宁可让它吵。
+ */
+process.on('unhandledRejection', (reason) => {
+  const msg = reason && reason.message ? reason.message : String(reason);
+  console.error(`\n\x1b[31m✗ 出现未处理的 Promise 拒绝：${msg}\x1b[0m`);
+  console.error('\x1b[90m  通常意味着某个模块在导入时执行了异步代码却没有兜住异常。\x1b[0m');
+  process.exitCode = 1;
+});
 
 /* ------------------------------------------------------------------ 准备 */
 
@@ -76,26 +92,30 @@ const jsFiles = [];
   }
 })(SRC);
 
+// 用 `node --check` 做纯解析检查，**不 import**。
+//
+// 曾经这里用 import() 来「顺带校验语法」，结果 main.js 在导入时就会执行 boot()，
+// 它依赖 document / indexedDB；boot 的 catch 处理器还会写入 document.body，
+// 于是抛出未处理的 Promise 拒绝，让进程以退出码 1 结束。
+// 本地因为进程先跑完退出，表现不出来（竞态），CI 上稳定失败。
+// `node --check` 只解析不执行，既没有副作用，也能照样抓出语法错误。
 let syntaxBad = 0;
 for (const f of jsFiles) {
   const rel = path.relative(SRC, f);
+  const target = path.join(TMP, 'js', rel);
   try {
-    await import(url.pathToFileURL(path.join(TMP, 'js', rel)).href + '?s=' + Date.now());
+    execFileSync(process.execPath, ['--check', target], { stdio: 'pipe' });
     pass++;
   } catch (e) {
-    // main.js 会在导入时调用 boot()，依赖 DOM，属预期失败
-    if (rel === 'main.js' && /document|navigator|window|indexedDB/i.test(e.message)) {
-      pass++;
-      console.log(`  \x1b[32m✓\x1b[0m ${rel}  \x1b[90m（含 DOM 引导代码，跳过运行时导入）\x1b[0m`);
-    } else {
-      syntaxBad++;
-      fail++;
-      failures.push(`${rel} 语法/导入`);
-      console.log(`  \x1b[31m✗\x1b[0m ${rel}  \x1b[31m${e.message}\x1b[0m`);
-    }
+    syntaxBad++;
+    fail++;
+    failures.push(`${rel} 语法`);
+    const raw = String(e.stderr || e.message);
+    const line = raw.split('\n').find((l) => /SyntaxError|Unexpected|Error/.test(l)) || raw.split('\n')[0];
+    console.log(`  \x1b[31m✗\x1b[0m ${rel}  \x1b[31m${String(line).trim().slice(0, 120)}\x1b[0m`);
   }
 }
-console.log(`  \x1b[90m共 ${jsFiles.length} 个模块，${syntaxBad} 个有问题\x1b[0m`);
+console.log(`  \x1b[90m共 ${jsFiles.length} 个模块，${syntaxBad} 个语法有问题\x1b[0m`);
 
 // ---------- 2. 拼音
 section('二、拼音检索');
