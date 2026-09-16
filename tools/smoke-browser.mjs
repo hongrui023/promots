@@ -154,7 +154,32 @@ client.on('Runtime.exceptionThrown', (p) => {
 await client.send('Runtime.enable');
 await client.send('Page.enable');
 
-console.log('\x1b[1m一、页面加载\x1b[0m');
+console.log('\x1b[1m〇、清理缓存（保证测的是最新代码）\x1b[0m');
+
+// 必须先清掉 Service Worker 与缓存再测。
+// PWA 会缓存应用外壳，不清的话测的是上一次的旧代码，会得出假结论——
+// 这个坑真实踩到过：新增一个同步通道后，测试仍报旧通道数量。
+await client.send('Page.navigate', { url: PAGE_URL });
+await sleep(1500);
+const cleaned = await client.eval(`(async () => {
+  let sw = 0, ck = 0;
+  try {
+    const rs = await navigator.serviceWorker.getRegistrations();
+    sw = rs.length;
+    await Promise.all(rs.map(r => r.unregister()));
+    const keys = await caches.keys();
+    ck = keys.length;
+    await Promise.all(keys.map(k => caches.delete(k)));
+  } catch (_) {}
+  return { sw, ck };
+})()`);
+console.log(`  \x1b[90m注销 Service Worker ${cleaned.sw} 个，清空缓存 ${cleaned.ck} 个\x1b[0m`);
+ok('缓存已清空，测试环境干净', true, `SW ${cleaned.sw} / Cache ${cleaned.ck}`);
+
+await client.send('Network.enable');
+await client.send('Network.setCacheDisabled', { cacheDisabled: true });
+
+console.log('\n\x1b[1m一、页面加载\x1b[0m');
 
 const loadPromise = new Promise((resolve) => {
   let done = false;
@@ -318,11 +343,34 @@ const settings = await client.eval(`(async () => {
   document.querySelector('#btn-settings').click();
   await new Promise(r => setTimeout(r, 600));
   const tabs = Array.from(document.querySelectorAll('.tab')).map(t => t.textContent);
-  const providers = Array.from(document.querySelectorAll('.provider-card .pc-name')).map(e => e.textContent);
-  return { tabs, providers };
+  const cards = Array.from(document.querySelectorAll('.provider-card'));
+  const providers = cards.map(c => (c.querySelector('.pc-name')||{}).textContent || '');
+  const badges = cards.map(c => (c.querySelector('.pc-rec')||{}).textContent || '');
+  return { tabs, providers, badges };
 })()`);
 ok('设置弹窗含 4 个标签页', settings.tabs.length === 4, settings.tabs.join(' / '));
-ok('同步通道全部展示', settings.providers.length === 5, settings.providers.join(' / '));
+ok('同步通道全部展示（含微云共 6 个）', settings.providers.length === 6, settings.providers.join(' / '));
+ok('微云排在首位', /微云/.test(settings.providers[0] || ''), settings.providers[0]);
+ok('微云带「桌面端推荐」标记', /桌面端推荐/.test(settings.badges[0] || ''), settings.badges.join(' | '));
+
+// 选中微云后应出现 Token 输入框与取 Token 的链接
+const weiyunForm = await client.eval(`(async () => {
+  const cards = Array.from(document.querySelectorAll('.provider-card'));
+  const target = cards.find(c => /微云/.test(c.querySelector('.pc-name').textContent));
+  target.click();
+  await new Promise(r => setTimeout(r, 700));
+  const modal = document.querySelector('.modal');
+  const pw = modal.querySelector('input[type=password]');
+  const link = Array.from(modal.querySelectorAll('a')).map(a => a.href);
+  const labels = Array.from(modal.querySelectorAll('.field > label')).map(l => l.textContent);
+  return { hasPassword: !!pw, link, labels };
+})()`);
+ok('微云配置表单出现 Token 输入框', weiyunForm.hasPassword === true, weiyunForm.labels.join(' / '));
+ok(
+  'Token 申请链接指向微云官方页面',
+  weiyunForm.link.some((h) => /weiyun\.com\/act\/openclaw/.test(h)),
+  weiyunForm.link.find((h) => /weiyun/.test(h)) || '未找到链接'
+);
 
 await client.eval(`document.querySelector('.modal-head .icon-btn').click()`);
 await sleep(400);

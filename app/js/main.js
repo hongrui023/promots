@@ -10,7 +10,7 @@ import {
 import { CATEGORIES, CATEGORY_MAP, categoryMeta, autoClassify, categoryName, reclassifyAll, classifyByRules, RULE_LEXICON_SIZE } from './classify.js';
 import * as llm from './llm.js';
 import * as syncMgr from './sync/manager.js';
-import { ADAPTERS, ADAPTER_MAP, RECOMMENDED } from './sync/adapters.js';
+import { ADAPTERS, ADAPTER_MAP, RECOMMENDED, badgeOf } from './sync/adapters.js';
 import { SEED_PROMPTS } from './seed.js';
 import {
   el, clear, toast, modal, confirmDialog, copyText, fmtTime, fmtFull,
@@ -802,21 +802,22 @@ async function renderSyncTab() {
   for (const a of ADAPTERS) {
     const on = cfg.provider === a.key;
     const disabled = !a.available();
+    const reason = a.unavailableReason ? a.unavailableReason() : '';
     const card = el('div.provider-card' + (on ? '.active' : ''), {
       style: disabled ? { opacity: '.58' } : {},
       onclick: async () => {
-        if (disabled) { toast(a.unavailableReason(), 'warn', 4200); return; }
+        if (disabled) { toast(reason, 'warn', 4200); return; }
         await syncMgr.saveConfig({ provider: a.key });
         renderTabReload();
       },
     }, [
       el('div.pc-head', {}, [
         el('span.pc-name', { text: a.name }),
-        a.key === RECOMMENDED ? el('span.pc-rec', { text: '推荐' }) : null,
+        badgeOf(a.key) ? el('span.pc-rec', { text: badgeOf(a.key) }) : null,
         on ? el('span.dim', { text: '● 已启用' }) : null,
       ]),
       el('div.pc-desc', { text: a.desc }),
-      disabled ? el('div.pc-desc', { text: '⚠ ' + a.unavailableReason(), style: { color: 'var(--warn)' } }) : null,
+      reason ? el('div.pc-desc', { text: '⚠ ' + reason, style: { color: 'var(--warn)' } }) : null,
     ]);
     wrap.appendChild(card);
   }

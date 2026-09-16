@@ -118,6 +118,89 @@ ok('「翻译」含英文 translate', g2.includes('translate'), g2.join('、'));
 ok('未收录的词返回自身', syn.expand('zzz不存在zzz').length === 1);
 ok('同义组数量合理', syn.SYNONYM_COUNT >= 100, `${syn.SYNONYM_COUNT} 组`);
 
+// ---------- 3.5 哈希与微云上传参数
+section('三·五、哈希与微云上传参数');
+const hash = await mod('hash.js');
+const nodeCrypto = await import('node:crypto');
+
+const lens = [0, 1, 55, 56, 63, 64, 65, 127, 128, 129, 1000, 100000, 524288, 600000];
+let shaOk = true;
+let md5Ok = true;
+for (const n of lens) {
+  const buf = new Uint8Array(n);
+  for (let i = 0; i < n; i++) buf[i] = (i * 37 + 11) & 0xff;
+  const s = hash.sha1Hex(buf);
+  const m = hash.md5Hex(buf);
+  const expS = nodeCrypto.createHash('sha1').update(buf).digest('hex');
+  const expM = nodeCrypto.createHash('md5').update(buf).digest('hex');
+  if (s !== expS) {
+    shaOk = false;
+    console.log(`    \x1b[31mSHA1 长度 ${n} 不一致：${s} vs ${expS}\x1b[0m`);
+  }
+  if (m !== expM) {
+    md5Ok = false;
+    console.log(`    \x1b[31mMD5 长度 ${n} 不一致：${m} vs ${expM}\x1b[0m`);
+  }
+}
+ok(`SHA1 与 Node crypto 一致（${lens.length} 种长度，含 55/56/63/64/65 等 padding 边界）`, shaOk);
+ok(`MD5 与 Node crypto 一致（同上）`, md5Ok);
+
+// 内部状态：必须满足「缓冲区为空」的前提，否则应抛错而不是静默算错
+let stateThrew = false;
+try {
+  const s = new hash.SHA1().update(new TextEncoder().encode('abc'));
+  s.getStateHex();
+} catch (_) {
+  stateThrew = true;
+}
+ok('SHA1.getStateHex 在缓冲区非空时抛错（防止静默算错）', stateThrew);
+
+const wy = await mod('sync/weiyun.js');
+
+// 单块文件（< 512KB）：这是本应用的常态
+const small = new TextEncoder().encode(JSON.stringify({ hello: '微云', n: 42 }));
+const p1 = wy.computeUploadParams(small);
+ok('微云参数：单块文件分成 1 块', p1.blockCount === 1, `${p1.blockCount} 块`);
+ok('微云参数：单块时 block_sha_list 唯一项等于 file_sha', p1.blockShaList[0] === p1.fileSha);
+ok(
+  '微云参数：file_sha 等于整文件标准 SHA1',
+  p1.fileSha === nodeCrypto.createHash('sha1').update(small).digest('hex'),
+  p1.fileSha.slice(0, 16) + '…'
+);
+ok('微云参数：file_md5 等于整文件标准 MD5', p1.fileMd5 === nodeCrypto.createHash('md5').update(small).digest('hex'));
+ok('微云参数：check_data 为末尾 checkBlockSize 字节的 Base64', p1.checkData === hash.bytesToBase64(small), p1.checkData);
+ok('微云参数：check_sha 为 40 字符小写 hex', /^[0-9a-f]{40}$/.test(p1.checkSha));
+
+// 多块文件（> 512KB）：验证分块切分与最后一块语义
+const bigLen = 700000;
+const big = new Uint8Array(bigLen);
+for (let i = 0; i < bigLen; i++) big[i] = (i * 131 + 7) & 0xff;
+const p2 = wy.computeUploadParams(big);
+const expectLast = bigLen % 524288;
+ok('微云参数：700000 字节切成 2 块', p2.blockCount === 2, `${p2.blockCount} 块`);
+ok('微云参数：lastBlockSize 推导正确', p2.lastBlockSize === expectLast, `${p2.lastBlockSize}`);
+ok('微云参数：checkBlockSize 推导正确', p2.checkBlockSize === expectLast % 128, `${p2.checkBlockSize}`);
+ok('微云参数：非最后块的 sha 为 40 字符 hex', /^[0-9a-f]{40}$/.test(p2.blockShaList[0]), p2.blockShaList[0].slice(0, 16) + '…');
+ok(
+  '微云参数：最后一块 sha 等于整文件 SHA1',
+  p2.blockShaList[1] === nodeCrypto.createHash('sha1').update(big).digest('hex')
+);
+ok('微云参数：file_sha 恒等于 block_sha_list 末项（协议硬要求）', p2.fileSha === p2.blockShaList[p2.blockShaList.length - 1]);
+
+// 恰好 512KB：此时 lastBlockSize 应回落为整块而不是 0
+const exact = new Uint8Array(524288);
+const p3 = wy.computeUploadParams(exact);
+ok('微云参数：恰好 512KB 时 lastBlockSize 回落为 524288（不是 0）', p3.lastBlockSize === 524288, `${p3.lastBlockSize}`);
+
+// 空文件应明确报错
+let emptyThrew = false;
+try {
+  wy.computeUploadParams(new Uint8Array(0));
+} catch (_) {
+  emptyThrew = true;
+}
+ok('微云参数：空文件明确报错而非产出错误哈希', emptyThrew);
+
 // ---------- 4. 分类
 section('四、自动分类');
 const cls = await mod('classify.js');
@@ -281,9 +364,16 @@ ok('高亮：正确定位命中区间', spans.length === 1 && spans[0][0] === 0 
 // ---------- 6. 同步适配器
 section('六、同步适配器');
 const ad = await mod('sync/adapters.js');
-ok('5 个通道已注册', ad.ADAPTERS.length === 5, ad.ADAPTERS.map((a) => a.name).join(' / '));
+ok('6 个通道已注册', ad.ADAPTERS.length === 6, ad.ADAPTERS.map((a) => a.name).join(' / '));
 ok('每个通道都有 test/pull/push', ad.ADAPTERS.every((a) => typeof a.test === 'function' && typeof a.pull === 'function' && typeof a.push === 'function'));
+ok('每个通道都有 key/name/desc/fields', ad.ADAPTERS.every((a) => a.key && a.name && a.desc && Array.isArray(a.fields)));
 ok('推荐通道存在', Boolean(ad.ADAPTER_MAP.get(ad.RECOMMENDED)), ad.RECOMMENDED);
+ok('微云通道已注册且带 Token 字段', Boolean(ad.ADAPTER_MAP.get('weiyun')?.fields.find((f) => f.key === 'mcpToken')));
+ok(
+  '微云 Token 字段指向官方自助领取页',
+  /weiyun\.com\/act\/openclaw/.test(ad.ADAPTER_MAP.get('weiyun').fields.find((f) => f.key === 'mcpToken').link || '')
+);
+
 const baidu = ad.ADAPTER_MAP.get('baidupan');
 const authUrl = baidu.getAuthUrl({ appKey: 'TESTKEY', redirectUri: 'http://127.0.0.1:5180/oauth-callback.html', appId: '123' });
 ok('百度授权链接可生成', authUrl.startsWith('https://openapi.baidu.com/oauth/2.0/authorize?') && authUrl.includes('scope=basic%2Cnetdisk'), authUrl.slice(0, 72) + '…');

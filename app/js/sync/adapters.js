@@ -14,53 +14,16 @@
  * 快照就是 store.snapshot() 的产物：{schema, exportedAt, device, items[]}
  */
 
+import { describeError, httpJson, httpRequest, isDesktop } from './http.js';
+import { weiyun } from './weiyun.js';
+
+// 供 sync/manager.js 沿用原有导入路径
+export { describeError };
+
 /* ------------------------------------------------------------------ 通用 */
 
-export function describeError(e) {
-  if (!e) return '未知错误';
-  if (e.name === 'AbortError') return '请求超时';
-  if (e instanceof TypeError && /fetch/i.test(String(e.message))) {
-    return '被浏览器跨域策略（CORS）拦截。请改用桌面端，或换一个允许跨域的通道。';
-  }
-  return e.message || String(e);
-}
-
-async function httpJson(url, { method = 'GET', headers = {}, body = null, timeout = 25000 } = {}) {
-  // 桌面端优先走主进程，规避 CORS 与混合内容限制
-  if (globalThis.__aiph?.httpRequest) {
-    const r = await globalThis.__aiph.httpRequest({ url, method, headers, body, timeout });
-    return { status: r.status, ok: r.status >= 200 && r.status < 300, text: r.body };
-  }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
-  try {
-    const res = await fetch(url, { method, headers, body, signal: controller.signal });
-    const text = await res.text();
-    return { status: res.status, ok: res.ok, text };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-async function httpRaw(url, opts = {}) {
-  // FormData 不经过 IPC（结构化克隆语义不稳），且桌面端已注入 CORS 头，直接 fetch 即可
-  const viaNative = globalThis.__aiph?.httpRequest && !(opts.body instanceof FormData);
-  if (viaNative) {
-    const r = await globalThis.__aiph.httpRequest({ ...opts, url, raw: true });
-    return { status: r.status, ok: r.status >= 200 && r.status < 300, text: r.body, headers: r.headers || {} };
-  }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), opts.timeout || 60000);
-  try {
-    const res = await fetch(url, { ...opts, signal: controller.signal });
-    const text = await res.text();
-    return { status: res.status, ok: res.ok, text, headers: Object.fromEntries(res.headers.entries()) };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-const isDesktop = () => Boolean(globalThis.__aiph?.isDesktop);
+/** 兼容旧调用名：请求实现已统一到 http.js */
+const httpRaw = httpRequest;
 
 /* ------------------------------------------------------------------ 1. 本地同步文件夹 */
 
@@ -549,6 +512,18 @@ export const manual = {
 
 /* ------------------------------------------------------------------ 注册表 */
 
-export const ADAPTERS = [gist, localFolder, webdav, baidupan, manual];
+/** 顺序即设置页的展示顺序：桌面端最顺手的排前面 */
+export const ADAPTERS = [weiyun, gist, localFolder, webdav, baidupan, manual];
 export const ADAPTER_MAP = new Map(ADAPTERS.map((a) => [a.key, a]));
-export const RECOMMENDED = 'gist';
+
+/** 默认推荐。微云是桌面端首选，Gist 是跨平台兜底。 */
+export const RECOMMENDED = 'weiyun';
+
+export const BADGES = {
+  weiyun: '桌面端推荐',
+  gist: '跨平台推荐',
+};
+
+export function badgeOf(key) {
+  return BADGES[key] || '';
+}

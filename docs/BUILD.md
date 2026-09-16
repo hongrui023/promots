@@ -158,21 +158,71 @@ cd android
 
 ## 五、自检
 
-改完核心算法后务必跑一遍：
+三层测试，改完代码后按需跑：
 
 ```bash
+# 1) 核心引擎 —— 不需要任何外部依赖，随时可跑
 node tools/verify.mjs
 ```
 
-覆盖：全部模块语法、拼音检索、近义词扩展、自动分类（13 个用例）、四种搜索模式、过滤器、排序、边界情况、同步适配器注册。当前 **66 项全部通过**。
-
-调试某条指令的分类打分明细：
+覆盖：全部模块语法、拼音检索、近义词扩展、SHA1/MD5（对照 Node crypto 逐字节校验）、
+微云上传参数、自动分类（13 个用例）、四种搜索模式、过滤器、排序、边界情况、同步适配器注册。
+当前 **89 项全部通过**。
 
 ```bash
+# 2) 界面 —— 需要先起服务，再起一个带调试端口的浏览器
+npm run serve
+# 另开一个终端：
+"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --headless=new ^
+  --remote-debugging-port=9222 --user-data-dir=%TEMP%\aiph-smoke --no-first-run about:blank
+node tools/smoke-browser.mjs
+```
+
+覆盖：渲染、四种搜索的交互、侧边栏筛选、编辑器自动分类联动、设置页六个通道与微云表单、
+响应式布局（桌面 + 移动截图）、零控制台错误。当前 **40 项全部通过**。
+
+> 测试会先注销 Service Worker 并清空缓存。不清的话 PWA 会拿旧外壳，测出假结果。
+
+```bash
+# 3) 微云通道 —— 需要你自己的微云 Token，会真实读写你的微云
+node tools/weiyun-e2e.mjs --token <你的Token> --big
+```
+
+覆盖：连通性、目录自动创建、上传下载往返逐字节比对、多分块路径（>512KB）、
+重复上传不堆积、临时文件清理。当前 **18 项全部通过**。
+
+> `--big` 会在测试结束后自动删除它创建的临时大文件（823 KB）。
+> 主数据文件 `AI-PromptHub/ai-prompt-hub.json` 会保留——那正是同步要用的文件。
+
+### 与官方实现交叉验证
+
+微云的上传协议用的是 **SHA-1 未经 finalization 的内部寄存器状态**，没有标准库能验证。
+唯一可信参照物是微云官方提供的 Python 脚本：
+
+```bash
+# 本项目的实现
+node tools/weiyun-params.mjs <任意文件>
+
+# 官方参照（需本机有 python）
+python <微云skill目录>/scripts/gen_block_info_list.py <同一个文件>
+```
+
+两者的 `file_sha` / `file_md5` / `check_sha` / `check_data` / `block_sha_list` 必须完全一致。
+已用 600 KB 双分块文件验证过：**247 字节输出零差异**。
+
+### 其他调试工具
+
+```bash
+# 看某条指令的分类打分依据
 node tools/debug-classify.mjs "小红书种草文案"
 ```
 
 会打印各分类的得分、胜出分类、置信度，以及命中的关键词证据。
+
+### 已知的 Windows 命令行陷阱
+
+用 git-bash 时，`/c/Users/...` 这类路径**不能**作为参数传给原生 exe（node / python），
+会被解释成相对当前盘根的路径 `c:\c\Users\...`。传参一律用 `C:/Users/...` 形式。
 
 ---
 
